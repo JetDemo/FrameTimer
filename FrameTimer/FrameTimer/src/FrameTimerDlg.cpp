@@ -217,7 +217,7 @@ void CFrameTimerDlg::OnTimer(UINT_PTR nIDEvent)
     switch(nIDEvent)
     {
     case TIMER_LATENCY_EXE:
-        //z KillTimer(TIMER_LATENCY_EXE);
+        // KillTimer(TIMER_LATENCY_EXE);
         break;
     }
 
