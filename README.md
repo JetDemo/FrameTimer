@@ -4,7 +4,7 @@
 ## usage
 - frame timer.
 
-![alt text](FrameTimer/FrameTimer/doc/FrameTimer.png)
+![alt text](FrameTimer/FrameTimer/doc/FrameTimer(1.0.0.2).png)
 
 ## download
 
