@@ -1,6 +1,7 @@
 # release
 |name|desc|
 |-|-|
-|FrameTimer.Ver|0.000.01|
+|FrameTimer.Ver|0.000.02|
+|Compiler|vs2013.update5|
 |FrameTimer.exe|windows,x86|
 |FrameTimer(x64).exe|windows,x64|

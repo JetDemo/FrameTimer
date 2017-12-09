@@ -3,16 +3,22 @@
 //
 
 #pragma once
+
+#include <vector>
+
 #include "afxwin.h"
 #include "Utility.h"
 #include "GradientStatic.h"
+#include "jzl_win32_event.h"
 
 const int TIMER_LATENCY_EXE = 3927;
+
+#define WM_APP_UPDATE_TIMER (WM_APP+1)
 
 class CFrameTimerDlg : public CDialogEx
 {
 public:
-    CFrameTimerDlg(CWnd* pParent = NULL);
+    explicit CFrameTimerDlg(CWnd* pParent = NULL);
     ~CFrameTimerDlg();
 
     enum { IDD = IDD_FRAMETIMER_DIALOG };
@@ -29,21 +35,36 @@ private:
     void DoWorker();
 
     void ui_refresh_timer();
+	void key_reset_timer();
 
     static unsigned int _stdcall sdl_event(PVOID pM);
     void do_sdl_event();
     void schedule_render(const int delay);
 
+	void init_fps_vec();
+	void init_fps_cmb();
+	const int get_cur_fps() const;
+
+	void start_timer();
+	void stop_timer();
+
+
 // data
 private:
     CFont* m_pBoldFont;
+	int m_nFrameCnt;
     CString strFrameTimer;
     HANDLE m_hTimer;
     HANDLE m_hThread;
 
     bool m_bStop;
     bool can_move;
-    int fps;
+
+	std::vector<int> v_fps;
+	CComboBox m_cmbFps;
+	int m_cmbFpsIdx;
+
+	JzlWin32Event event_timer_thread;
 
 protected:
     HICON m_hIcon;
@@ -60,4 +81,6 @@ public:
     afx_msg void OnMouseMove(UINT nFlags, CPoint point);
     afx_msg void OnLButtonDown(UINT nFlags, CPoint point);
     afx_msg void OnLButtonUp(UINT nFlags, CPoint point);
+	afx_msg void OnCbnSelchangeCmbFps();
+	afx_msg LRESULT OnTimerUpdate(WPARAM wParam, LPARAM lParam);
 };

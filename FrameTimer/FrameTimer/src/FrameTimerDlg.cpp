@@ -3,9 +3,13 @@
 //
 
 #include "stdafx.h"
+
 #include "FrameTimer.h"
+#include "jzl_app_event.h"
 #include "FrameTimerDlg.h"
 #include "afxdialogex.h"
+
+#include "resource.h"
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
@@ -32,10 +36,13 @@ uint32_t sdl_render(uint32_t interval, void *ctx)
 CFrameTimerDlg::CFrameTimerDlg(CWnd* pParent /*=NULL*/)
     : CDialogEx(CFrameTimerDlg::IDD, pParent),
       m_pBoldFont(NULL),
-      m_hTimer(INVALID_HANDLE_VALUE),
+      m_hTimer(NULL),
+	  m_hThread(NULL),
       m_bStop(false),
       can_move(false),
-      fps(25)
+	  m_nFrameCnt(0), 
+	  m_cmbFpsIdx(0),
+	  event_timer_thread()
 {
     m_hIcon = AfxGetApp()->LoadIcon(IDR_MAINFRAME);
 
@@ -44,6 +51,8 @@ CFrameTimerDlg::CFrameTimerDlg(CWnd* pParent /*=NULL*/)
                             ANTIALIASED_QUALITY,0,_T("Arial"));
 
     m_hTimer = CreateWaitableTimer(NULL,0,0);
+
+	init_fps_vec();
 }
 
 CFrameTimerDlg::~CFrameTimerDlg()
@@ -57,8 +66,10 @@ CFrameTimerDlg::~CFrameTimerDlg()
 
 void CFrameTimerDlg::DoDataExchange(CDataExchange* pDX)
 {
-    CDialogEx::DoDataExchange(pDX);
-    DDX_Control(pDX, IDC_ST_FRAME_TIMER, m_stFrameTimer);
+	CDialogEx::DoDataExchange(pDX);
+	DDX_Control(pDX, IDC_ST_FRAME_TIMER, m_stFrameTimer);
+	DDX_Control(pDX, IDC_CMB_FPS, m_cmbFps);
+	DDX_CBIndex(pDX, IDC_CMB_FPS, m_cmbFpsIdx);
 }
 
 BEGIN_MESSAGE_MAP(CFrameTimerDlg, CDialogEx)
@@ -69,10 +80,37 @@ BEGIN_MESSAGE_MAP(CFrameTimerDlg, CDialogEx)
     ON_WM_MOUSEMOVE()
     ON_WM_LBUTTONDOWN()
     ON_WM_LBUTTONUP()
+	ON_CBN_SELCHANGE(IDC_CMB_FPS, &CFrameTimerDlg::OnCbnSelchangeCmbFps)
+	ON_MESSAGE(WM_APP_UPDATE_TIMER, OnTimerUpdate)
 END_MESSAGE_MAP()
 
 
 // CFrameTimerDlg 消息处理程序
+
+void CFrameTimerDlg::init_fps_vec()
+{
+	v_fps.reserve(4);
+
+	v_fps.push_back(25);
+	v_fps.push_back(30);
+	v_fps.push_back(50);
+	v_fps.push_back(60);
+}
+
+void CFrameTimerDlg::init_fps_cmb()
+{
+	CString str;
+	
+	const int length = static_cast<int>(v_fps.size());
+	for(int i = 0 ; i < length; ++i)
+	{
+		str.Format(_T("%d"),v_fps[i]);
+
+		m_cmbFps.AddString(str);
+	}
+
+	m_cmbFps.SetCurSel(m_cmbFpsIdx);
+}
 
 BOOL CFrameTimerDlg::OnInitDialog()
 {
@@ -151,18 +189,55 @@ void CFrameTimerDlg::InitUI()
                    nH, // height
                    SWP_SHOWWINDOW );// window-positioning options);
 
-    LARGE_INTEGER li;
-    li.QuadPart = 10*1000;
+	init_fps_cmb();
 
-    SetWaitableTimer(
-        m_hTimer,
-        &li,
-        40,
-        0,
-        0,
-        false);
+	start_timer();
+}
 
-    m_hThread = (HANDLE)_beginthreadex(0,0,TH_Worker,(void*) this,0,0);
+const int CFrameTimerDlg::get_cur_fps() const
+{
+	return v_fps[m_cmbFpsIdx];
+}
+
+void CFrameTimerDlg::start_timer()
+{
+	stop_timer();
+
+	m_bStop = false;
+
+	LARGE_INTEGER li;
+	li.QuadPart = 10*1000;
+		
+	const int cur_fps = get_cur_fps();	
+
+	SetWaitableTimer(
+		m_hTimer,
+		&li,
+		static_cast<int>(1000.0f/cur_fps),
+		0,
+		0,
+		false);
+
+	m_hThread = (HANDLE)_beginthreadex(0,0,TH_Worker,(void*) this,0,0);
+}
+
+void CFrameTimerDlg::stop_timer()
+{
+	if(m_hThread)
+	{
+		m_bStop = true;
+
+		WaitForSingleObject(event_timer_thread, INFINITE);
+		event_timer_thread.reset_event();
+		key_reset_timer();
+
+		m_hThread = NULL;
+	}
+
+	if (m_hTimer)
+	{
+		CancelWaitableTimer(m_hTimer);
+	}
 }
 
 unsigned int _stdcall CFrameTimerDlg::TH_Worker(PVOID pM)
@@ -176,25 +251,32 @@ unsigned int _stdcall CFrameTimerDlg::TH_Worker(PVOID pM)
     return TRUE;
 }
 
+void CFrameTimerDlg::key_reset_timer()
+{
+	m_nFrameCnt = 0;
+}
+
 void CFrameTimerDlg::ui_refresh_timer()
 {
-    static int nFrameCnt = 0;
-    int nCnt = nFrameCnt;
-    const int nHour = nCnt /(3600*25);
-    nCnt -= nHour*3600*25;
-    const int nMinuter = (nCnt) /(60*25);
-    nCnt -= nMinuter*60*25;
-    const int nSecond = nCnt/25;
-    nCnt -= nSecond*25;
+    int nCnt = m_nFrameCnt;
+	++m_nFrameCnt;
+	const int fps = get_cur_fps();
+    const int nHour = nCnt /(3600*fps);
+    nCnt -= nHour*3600*fps;
+    const int nMinuter = (nCnt) /(60*fps);
+    nCnt -= nMinuter*60*fps;
+    const int nSecond = nCnt/fps;
+    nCnt -= nSecond*fps;
     const int nFrame = nCnt;
     strFrameTimer.Format(_T("%02d-%02d-%02d:%02d"),nHour,nMinuter,nSecond,nFrame);
-    ++nFrameCnt;
 
-    m_stFrameTimer.SetWindowText(strFrameTimer);
+	PostMessage(WM_APP_UPDATE_TIMER, (WPARAM)&strFrameTimer, NULL);
 }
 
 void CFrameTimerDlg::DoWorker()
 {
+	JzlScopedEvent scope(&event_timer_thread);
+
     while(!m_bStop)
     {
         WaitForSingleObject(m_hTimer,INFINITE);
@@ -242,6 +324,11 @@ BOOL CFrameTimerDlg::PreTranslateMessage(MSG* pMsg)
         {
             return TRUE;                // Do not process further
         }
+
+		if (pMsg->wParam == 'R')
+		{
+			key_reset_timer();
+		}
     }
 
     return CWnd::PreTranslateMessage(pMsg);
@@ -275,4 +362,23 @@ void CFrameTimerDlg::OnLButtonUp(UINT nFlags, CPoint point)
 {
     can_move = false;
     CDialogEx::OnLButtonUp(nFlags, point);
+}
+
+
+void CFrameTimerDlg::OnCbnSelchangeCmbFps()
+{
+	m_cmbFpsIdx = m_cmbFps.GetCurSel();
+
+	start_timer();
+}
+
+LRESULT CFrameTimerDlg::OnTimerUpdate(WPARAM wParam, LPARAM lParam)
+{
+	UNREFERENCED_PARAMETER(lParam);
+
+	CString* cur_frame_timer = (CString*)wParam;
+
+	m_stFrameTimer.SetWindowText(*cur_frame_timer);
+
+	return 0;
 }

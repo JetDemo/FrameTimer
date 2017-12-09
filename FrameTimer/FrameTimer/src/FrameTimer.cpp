@@ -57,7 +57,6 @@ BOOL CFrameTimerApp::InitInstance()
         return FALSE;
     }
 
-
     AfxEnableControlContainer();
 
     // 创建 shell 管理器，以防对话框包含
