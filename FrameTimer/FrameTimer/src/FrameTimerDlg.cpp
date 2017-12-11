@@ -89,12 +89,13 @@ END_MESSAGE_MAP()
 
 void CFrameTimerDlg::init_fps_vec()
 {
-	v_fps.reserve(4);
+	v_fps.reserve(5);
 
 	v_fps.push_back(25);
 	v_fps.push_back(30);
 	v_fps.push_back(50);
 	v_fps.push_back(60);
+	v_fps.push_back(100);
 }
 
 void CFrameTimerDlg::init_fps_cmb()
@@ -243,6 +244,7 @@ void CFrameTimerDlg::stop_timer()
 unsigned int _stdcall CFrameTimerDlg::TH_Worker(PVOID pM)
 {
     CFrameTimerDlg* pObj = (CFrameTimerDlg*)pM;
+
     if (pObj)
     {
         pObj->DoWorker();
